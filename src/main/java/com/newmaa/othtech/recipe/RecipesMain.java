@@ -157,7 +157,7 @@ public class RecipesMain implements IRecipePool {
             .itemInputs(
                 GTModHandler.getModItem("miscutils", "MU-metaitem.01", 0, 32140),
                 getGM(31027, 64),
-                getGM(31028, 64),
+                getGM(15560, 64),
                 getNanites(4, Materials.WhiteDwarfMatter),
                 getNanites(4, Materials.BlackDwarfMatter),
                 getNanites(4, Materials.Universium))
@@ -210,7 +210,7 @@ public class RecipesMain implements IRecipePool {
             .itemInputs(
                 OTHItemList.SteamNeinInOne.get(64),
                 getGM(31027, 64),
-                getGM(31028, 64),
+                getGM(15560, 64),
                 getGM(995, 64),
                 ItemList.Robot_Arm_LuV.get(16),
                 GTOreDictUnificator.get(OrePrefixes.circuit, Materials.UV, 64))
@@ -391,8 +391,8 @@ public class RecipesMain implements IRecipePool {
             new Object[] { getGM(23520, 64), getGM(23527, 64), getGM(23528, 64), getGM(10886, 64),
                 OTHItemList.itemEnqingM.get(64), OTHItemList.itemEnqingM.get(64), OTHItemList.itemEnqingM.get(64),
                 OTHItemList.itemEnqingM.get(64), ItemList.Robot_Arm_UMV.get(64),
-                new Object[] { OrePrefixes.circuit.get(Materials.MAX), 64 },
-                new Object[] { OrePrefixes.circuit.get(Materials.MAX), 64 }, ItemList.Field_Generator_UMV.get(64),
+                new Object[] { OrePrefixes.circuit.get(Materials.UXV), 64 },
+                new Object[] { OrePrefixes.circuit.get(Materials.UXV), 64 }, ItemList.Field_Generator_UMV.get(64),
                 new ItemStack(Items.bread, 64), new ItemStack(Items.nether_star, 64), getGM(15297, 64),
                 getGM(15197, 64),
 
@@ -596,9 +596,9 @@ public class RecipesMain implements IRecipePool {
         RecipeBuilder.builder()
             .itemInputs(
                 GTModHandler.getModItem("gregtech", "gt.blockmachines", 64, 31027),
-                GTModHandler.getModItem("gregtech", "gt.blockmachines", 64, 31028),
+                GTModHandler.getModItem("gregtech", "gt.blockmachines", 64, 15560),
                 GTModHandler.getModItem("gregtech", "gt.blockmachines", 64, 995),
-                GTOreDictUnificator.get(OrePrefixes.circuit, Materials.MAX, 64))
+                GTOreDictUnificator.get(OrePrefixes.circuit, Materials.UHV, 64))
             .itemOutputs(GTModHandler.getModItem("gregtech", "gt.blockmachines", 1, IDs + 24))
             .fluidInputs(FluidRegistry.getFluidStack("advancedglue", 262144))
             .duration(114514)
@@ -1116,8 +1116,8 @@ public class RecipesMain implements IRecipePool {
                 ItemList.EnergisedTesseract.get(16),
                 OTHItemList.UEVA.get(4),
                 OTHItemList.UEVB.get(4),
-                GTOreDictUnificator.get(OrePrefixes.circuit, Materials.MAX, 64),
-                GTOreDictUnificator.get(OrePrefixes.circuit, Materials.ZPM, 64),
+                GTOreDictUnificator.get(OrePrefixes.circuit, Materials.UIV, 64),
+                GTOreDictUnificator.get(OrePrefixes.circuit, Materials.UEV, 64),
                 GTOreDictUnificator.get(OrePrefixes.circuit, Materials.UHV, 64),
                 GTOreDictUnificator.get(OrePrefixes.wireGt04, Materials.SuperconductorUEV, 64))
             .fluidInputs(
@@ -1256,8 +1256,8 @@ public class RecipesMain implements IRecipePool {
             .itemInputs(
                 GTModHandler.getModItem(GregTech.ID, "gt.blockmachines", 64, 12735),
                 OTHItemList.LCA.get(64),
-                new Object[] { OrePrefixes.circuit.get(Materials.MAX), 64 },
-                new Object[] { OrePrefixes.circuit.get(Materials.MAX), 64 },
+                new Object[] { OrePrefixes.circuit.get(Materials.UHV), 64 },
+                new Object[] { OrePrefixes.circuit.get(Materials.UHV), 64 },
                 ItemList.Robot_Arm_UV.get(16),
                 ItemList.Electric_Motor_UV.get(64),
                 ItemList.Electric_Pump_UV.get(32),

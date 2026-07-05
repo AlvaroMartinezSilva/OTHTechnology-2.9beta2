@@ -33,7 +33,7 @@ public class RecipesQFTRecipes implements IRecipePool {
             .metadata(QFT_FOCUS_TIER, 2)
             .itemInputs(
                 GTModHandler.getModItem("gregtech", "gt.blockmachines", 0, 31027),
-                GTModHandler.getModItem("gregtech", "gt.blockmachines", 0, 31028))
+                GTModHandler.getModItem("gregtech", "gt.blockmachines", 0, 15560))
             .fluidInputs(new FluidStack(songyou, 123), new FluidStack(laoda, 24))
             .itemOutputs(
                 GTModHandler.getModItem("miscutils", "itemDustRhenium", 16),
