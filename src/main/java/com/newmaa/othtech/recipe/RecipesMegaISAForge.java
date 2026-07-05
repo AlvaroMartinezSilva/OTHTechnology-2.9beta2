@@ -185,7 +185,7 @@ public class RecipesMegaISAForge implements IRecipePool {
             .addTo(ISA);
         GTValues.RA.stdBuilder()
             .itemInputs(
-                GTModHandler.getModItem("gregtech", "gt.blockmachines", 0, 31028),
+                GTModHandler.getModItem("gregtech", "gt.blockmachines", 0, 15560),
                 OTHItemList.beeISAM.get(1),
                 GTModHandler.getModItem("gregtech", "gt.metaitem.03", 16, 4139),
                 ItemList.Field_Generator_UMV.get(4))
@@ -266,8 +266,8 @@ public class RecipesMegaISAForge implements IRecipePool {
                 GTUtility.getIntegratedCircuit(13),
                 GTModHandler.getModItem("eternalsingularity", "eternal_singularity", 0),
                 GTOreDictUnificator.get(OrePrefixes.circuit, Materials.UHV, 64),
-                GTOreDictUnificator.get(OrePrefixes.circuit, Materials.LuV, 64),
-                GTOreDictUnificator.get(OrePrefixes.circuit, Materials.MAX, 64),
+                GTOreDictUnificator.get(OrePrefixes.circuit, Materials.UEV, 64),
+                GTOreDictUnificator.get(OrePrefixes.circuit, Materials.UIV, 64),
                 ItemList.Robot_Arm_UIV.get(64),
                 ItemList.Robot_Arm_UEV.get(64),
                 ItemList.Robot_Arm_UHV.get(64))
