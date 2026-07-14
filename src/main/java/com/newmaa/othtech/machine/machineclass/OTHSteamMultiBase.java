@@ -26,8 +26,8 @@ import com.gtnewhorizons.modularui.common.widget.DrawableWidget;
 import com.gtnewhorizons.modularui.common.widget.FakeSyncWidget;
 
 import gregtech.api.enums.Materials;
-import gregtech.api.enums.SteamVariant;
 import gregtech.api.enums.Textures;
+import gregtech.api.enums.TieredVariant;
 import gregtech.api.gui.modularui.CircularGaugeDrawable;
 import gregtech.api.gui.modularui.GTUITextures;
 import gregtech.api.interfaces.IHatchElement;
@@ -539,7 +539,7 @@ public abstract class OTHSteamMultiBase<T extends OTHSteamMultiBase<T>> extends 
     }
 
     protected static OverclockDescriber createOverclockDescriber() {
-        return new SteamOverclockDescriber(SteamVariant.BRONZE, 1, 2);
+        return new SteamOverclockDescriber(TieredVariant.BRONZE, 1, 2);
     }
 
     @Override
