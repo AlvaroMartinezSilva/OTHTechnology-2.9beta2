@@ -39,6 +39,8 @@ public class Config {
             "A",
             enableQuestInjection,
             "A");
+        enableFPChating = configuration
+            .getBoolean("OTHTechnology : 开启123Technology自行复制体复读机功能, true为是, false为否", "A", enableFPChating, "A");
         if (configuration.hasChanged()) {
             configuration.save();
         }
@@ -54,4 +56,5 @@ public class Config {
     public static int tier_Ross123b = 1;
     public static boolean is_Enqing_Song_Play = true;
     public static boolean enableQuestInjection = true;
+    public static boolean enableFPChating = true;
 }

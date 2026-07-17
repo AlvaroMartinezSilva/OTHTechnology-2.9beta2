@@ -4,7 +4,9 @@ import static net.minecraft.util.StatCollector.translateToLocal;
 
 import java.util.ArrayList;
 
+import net.minecraft.client.entity.EntityPlayerSP;
 import net.minecraft.entity.EntityCreature;
+import net.minecraft.entity.EntityLiving;
 import net.minecraft.item.ItemStack;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.util.ChatComponentText;
@@ -15,12 +17,13 @@ import org.jetbrains.annotations.NotNull;
 
 import com.kuba6000.mobsinfo.api.IMobInfoProvider;
 import com.kuba6000.mobsinfo.api.MobDrop;
+import com.newmaa.othtech.Config;
 import com.newmaa.othtech.common.OTHItemList;
 import com.newmaa.othtech.common.item.ItemLoader;
 
 import gtPlusPlus.core.item.food.BaseItemMetaFood;
 
-public class EntityFakePlayer extends EntityCreature implements IMobInfoProvider {
+public class EntityFakePlayer extends EntityLiving implements IMobInfoProvider {
 
     private static final int DATAWATCHER_ID_SITTING = 20;
     private int sitCooldown = 0;
@@ -48,15 +51,12 @@ public class EntityFakePlayer extends EntityCreature implements IMobInfoProvider
     }
 
     public void setSitting(boolean sitting) {
-        if (!this.worldObj.isRemote) { // 仅在服务端操作
-            // 更新字节值（1 = 坐下）
+        if (!this.worldObj.isRemote) {
             this.dataWatcher.updateObject(DATAWATCHER_ID_SITTING, (byte) (sitting ? 1 : 0));
-
-            // 坐下时禁止移动
             if (sitting) {
                 this.getNavigator()
                     .clearPathEntity();
-                this.setMoveForward(0.0F);
+                this.setAIMoveSpeed(0.0F);
             }
         }
     }
@@ -64,18 +64,17 @@ public class EntityFakePlayer extends EntityCreature implements IMobInfoProvider
     @Override
     public void onLivingUpdate() {
         super.onLivingUpdate();
-
-        // 每100 ticks（5秒）随机切换状态
         if (!this.worldObj.isRemote && this.sitCooldown-- <= 0) {
-            if (this.rand.nextInt(5) == 0) { // 20%概率触发
-                sendMessageToAll(translateToLocal("oth.clone.whereami"));
+            if (this.rand.nextInt(5) == 0) {
+                if (Config.enableFPChating) {
+                    sendMessageToAll(translateToLocal("oth.clone.whereami"));
+                }
                 this.setSitting(!this.isSitting());
                 this.sitCooldown = 100 + this.rand.nextInt(100); // 5-10秒冷却
             }
         }
     }
 
-    // 向所有玩家发送消息
     private void sendMessageToAll(String msg) {
         MinecraftServer.getServer()
             .getConfigurationManager()
