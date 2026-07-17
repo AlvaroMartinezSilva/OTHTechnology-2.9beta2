@@ -4,8 +4,6 @@ import static net.minecraft.util.StatCollector.translateToLocal;
 
 import java.util.ArrayList;
 
-import net.minecraft.client.entity.EntityPlayerSP;
-import net.minecraft.entity.EntityCreature;
 import net.minecraft.entity.EntityLiving;
 import net.minecraft.item.ItemStack;
 import net.minecraft.server.MinecraftServer;
