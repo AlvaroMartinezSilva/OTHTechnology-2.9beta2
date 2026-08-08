@@ -30,7 +30,7 @@ body:
     attributes:
       label: Your Proposal (你的提议)
       description: What do you propose? Please describe it briefly in one or two sentence. (你想提议什么?请用一两句话简要描述。)
-      placeholder: "Example: Add a new chain function. (示例: 添加一个新的连锁功能。)"
+      placeholder: "Example: Add a new function. (示例: 添加一个新的功能。)"
     validations:
       required: true
   - type: textarea
@@ -38,7 +38,7 @@ body:
     attributes:
       label: Your Goal (你的目标)
       description: Why is this feature needed? (为什么需要这个功能?)
-      placeholder: "Example: Old mode can't fill my heart. (示例: 旧的模式无法填满我的心。)"
+      placeholder: "Example: Old function can't fill my heart. (示例: 旧的功能无法填满我的心。)"
     validations:
       required: true
   - type: checkboxes
@@ -53,7 +53,5 @@ body:
           required: true
         - label: "I understand this change request may not attract enough attention and thus not be implemented. (我理解这个修改请求可能得不到足够的关注,因此可能不会被实现。)"
           required: true
-        - label: "I understand this change request may be rejected due to other community members thinking it's inappropriate. (我理解这个修改请求可能会因为其他社区成员认为不合适而被拒绝。)"
-          required: true
-        - label: "I believe this feature would make the pack better. (我相信这个功能会让整合包变得更好。)"
+        - label: "I believe this feature would make the mod better. (我相信这个功能会让模组变得更好。)"
           required: true
