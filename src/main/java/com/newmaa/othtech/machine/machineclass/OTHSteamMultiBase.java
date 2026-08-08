@@ -14,6 +14,7 @@ import java.util.Optional;
 import javax.annotation.Nonnull;
 
 import net.minecraft.item.ItemStack;
+import net.minecraft.util.StatCollector;
 import net.minecraftforge.common.util.ForgeDirection;
 import net.minecraftforge.fluids.FluidStack;
 
@@ -31,20 +32,25 @@ import gregtech.api.enums.TieredVariant;
 import gregtech.api.gui.modularui.CircularGaugeDrawable;
 import gregtech.api.gui.modularui.GTUITextures;
 import gregtech.api.interfaces.IHatchElement;
+import gregtech.api.interfaces.IOutputBus;
 import gregtech.api.interfaces.ITexture;
 import gregtech.api.interfaces.metatileentity.IMetaTileEntity;
 import gregtech.api.interfaces.tileentity.IGregTechTileEntity;
 import gregtech.api.interfaces.tileentity.IOverclockDescriptionProvider;
 import gregtech.api.logic.ProcessingLogic;
 import gregtech.api.metatileentity.implementations.MTEBasicMachine;
+import gregtech.api.metatileentity.implementations.MTEHatch;
 import gregtech.api.metatileentity.implementations.MTEHatchInput;
 import gregtech.api.metatileentity.implementations.MTEHatchInputBus;
+import gregtech.api.metatileentity.implementations.MTEHatchOutputBus;
+import gregtech.api.metatileentity.implementations.MTEHatchVoidBus;
 import gregtech.api.objects.overclockdescriber.OverclockDescriber;
 import gregtech.api.objects.overclockdescriber.SteamOverclockDescriber;
 import gregtech.api.recipe.RecipeMap;
 import gregtech.api.recipe.check.CheckRecipeResult;
 import gregtech.api.recipe.check.CheckRecipeResultRegistry;
 import gregtech.api.structure.error.StructureError;
+import gregtech.api.structure.error.StructureErrors;
 import gregtech.api.util.GTUtility;
 import gregtech.api.util.HatchElementBuilder;
 import gregtech.api.util.IGTHatchAdder;
@@ -64,7 +70,8 @@ public abstract class OTHSteamMultiBase<T extends OTHSteamMultiBase<T>> extends 
     private final OverclockDescriber overclockDescriber;
 
     public ArrayList<MTEHatchSteamBusInput> mSteamInputs = new ArrayList<>();
-    public ArrayList<MTEHatchSteamBusOutput> mSteamOutputs = new ArrayList<>();
+    // 用 MTEHatchOutputBus 而不是 MTEHatchSteamBusOutput,以便兼容虚空输出仓(MTEHatchVoidBus)
+    public ArrayList<MTEHatchOutputBus> mSteamOutputs = new ArrayList<>();
     public ArrayList<MTEHatchCustomFluidBase> mSteamInputFluids = new ArrayList<>();
 
     public OTHSteamMultiBase(String aName) {
@@ -155,11 +162,8 @@ public abstract class OTHSteamMultiBase<T extends OTHSteamMultiBase<T>> extends 
     public void onPostTick(final IGregTechTileEntity aBaseMetaTileEntity, final long aTick) {
         if (aBaseMetaTileEntity.isServerSide()) {
             if (this.mUpdate == 1 || this.mStartUpCheck == 1) {
-                this.mSteamInputs.clear();
-                this.mSteamOutputs.clear();
-                this.mInputHatches.clear();
-                this.mSteamInputFluids.clear();
-                this.mOutputHatches.clear();
+                // 统一走 clearHatches(),避免手动清列表漏掉 mInputBusses/mOutputBusses 等
+                clearHatches();
             }
         }
         super.onPostTick(aBaseMetaTileEntity, aTick);
@@ -183,8 +187,103 @@ public abstract class OTHSteamMultiBase<T extends OTHSteamMultiBase<T>> extends 
 
     @Override
     public boolean addToMachineList(final IGregTechTileEntity aTileEntity, final int aBaseCasingIndex) {
+        if (aTileEntity == null) return false;
+        final IMetaTileEntity aMetaTileEntity = aTileEntity.getMetaTileEntity();
+        if (aMetaTileEntity == null) return false;
+
+        // 蒸汽仓优先分发:GTPP 基类的 addToMachineList 不认识 MTEHatchCustomFluidBase,
+        // 会把蒸汽输入仓丢进虚空(之前 mSteamInputFluids 永远是空的致命 bug)
+        if (addSteamInputFluidHatch(aTileEntity, aBaseCasingIndex)) return true;
+        if (addSteamBusInput(aTileEntity, aBaseCasingIndex)) return true;
+        if (addSteamBusOutput(aTileEntity, aBaseCasingIndex)) return true;
+
         return super.addToMachineList(aTileEntity, aBaseCasingIndex)
             || addExoticEnergyInputToMachineList(aTileEntity, aBaseCasingIndex);
+    }
+
+    /**
+     * 通用仓添加:更新纹理/合成图标/配方表,并去重。
+     */
+    public <E> boolean addToMachineListInternal(ArrayList<E> aList, final E aTileEntity, final int aBaseCasingIndex) {
+        if (aTileEntity == null) return false;
+
+        if (aTileEntity instanceof MTEHatch mteHatch) {
+            mteHatch.updateTexture(aBaseCasingIndex);
+            mteHatch.updateCraftingIcon(this.getMachineCraftingIcon());
+        }
+
+        // Set recipe map for input hatches.
+        if (aTileEntity instanceof MTEHatchInput hatch) hatch.mRecipeMap = getRecipeMap();
+        if (aTileEntity instanceof MTEHatchInputBus hatch) hatch.mRecipeMap = getRecipeMap();
+
+        if (aList.contains(aTileEntity)) return false;
+
+        return aList.add(aTileEntity);
+    }
+
+    /**
+     * 蒸汽输入总线(MTEHatchSteamBusInput)。
+     */
+    public boolean addSteamBusInput(final IGregTechTileEntity aTileEntity, final int aBaseCasingIndex) {
+        if (aTileEntity == null) return false;
+        final IMetaTileEntity aMetaTileEntity = aTileEntity.getMetaTileEntity();
+        if (aMetaTileEntity == null) return false;
+
+        if (aMetaTileEntity instanceof MTEHatchSteamBusInput steamBus) {
+            this.resetRecipeMapForHatch(aTileEntity, getRecipeMap());
+            return addToMachineListInternal(mSteamInputs, steamBus, aBaseCasingIndex);
+        }
+        return false;
+    }
+
+    /**
+     * 蒸汽输出总线(MTEHatchSteamBusOutput),兼容虚空输出仓(MTEHatchVoidBus)。
+     */
+    public boolean addSteamBusOutput(final IGregTechTileEntity aTileEntity, final int aBaseCasingIndex) {
+        if (aTileEntity == null) return false;
+        final IMetaTileEntity aMetaTileEntity = aTileEntity.getMetaTileEntity();
+        if (aMetaTileEntity == null) return false;
+
+        if (aMetaTileEntity instanceof MTEHatchSteamBusOutput || aMetaTileEntity instanceof MTEHatchVoidBus) {
+            return addToMachineListInternal(mSteamOutputs, (MTEHatchOutputBus) aMetaTileEntity, aBaseCasingIndex);
+        }
+        return false;
+    }
+
+    /**
+     * 蒸汽输入仓(MTEHatchCustomFluidBase,锁定为蒸汽)。只接受一个。
+     */
+    public boolean addSteamInputFluidHatch(final IGregTechTileEntity aTileEntity, final int aBaseCasingIndex) {
+        if (aTileEntity == null) return false;
+        final IMetaTileEntity aMetaTileEntity = aTileEntity.getMetaTileEntity();
+        if (aMetaTileEntity == null) return false;
+
+        if (aMetaTileEntity instanceof MTEHatchCustomFluidBase fluidHatch
+            && fluidHatch.mLockedFluid.equals(Materials.Steam.mGas)
+            && mSteamInputFluids.isEmpty()) {
+            return addToMachineListInternal(mSteamInputFluids, fluidHatch, aBaseCasingIndex);
+        }
+        return false;
+    }
+
+    public boolean resetRecipeMapForHatch(IGregTechTileEntity aTileEntity, RecipeMap<?> aMap) {
+        if (aTileEntity == null) return false;
+        IMetaTileEntity meta = aTileEntity.getMetaTileEntity();
+        if (meta instanceof MTEHatch hatch) return resetRecipeMapForHatch(hatch, aMap);
+        return false;
+    }
+
+    public boolean resetRecipeMapForHatch(MTEHatch aTileEntity, RecipeMap<?> aMap) {
+        if (aTileEntity == null) return false;
+        if (aTileEntity instanceof MTEHatchInput hatch) {
+            hatch.mRecipeMap = aMap;
+            return true;
+        }
+        if (aTileEntity instanceof MTEHatchInputBus hatch) {
+            hatch.mRecipeMap = aMap;
+            return true;
+        }
+        return false;
     }
 
     /*
@@ -212,13 +311,12 @@ public abstract class OTHSteamMultiBase<T extends OTHSteamMultiBase<T>> extends 
         if (GTUtility.isStackInvalid(aStack)) return false;
         FluidStack aLiquid = GTUtility.getFluidForFilledItem(aStack, true);
         if (aLiquid != null) return depleteInput(aLiquid);
+        // 蒸汽输入仓是单格流体仓,固定检查第 0 格
         for (MTEHatchCustomFluidBase tHatch : validMTEList(mSteamInputFluids)) {
-            if (GTUtility.areStacksEqual(
-                aStack,
-                tHatch.getBaseMetaTileEntity()
-                    .getStackInSlot(0))) {
-                if (tHatch.getBaseMetaTileEntity()
-                    .getStackInSlot(0).stackSize >= aStack.stackSize) {
+            ItemStack slot0 = tHatch.getBaseMetaTileEntity()
+                .getStackInSlot(0);
+            if (slot0 != null && GTUtility.areStacksEqual(aStack, slot0)) {
+                if (slot0.stackSize >= aStack.stackSize) {
                     tHatch.getBaseMetaTileEntity()
                         .decrStackSize(0, aStack.stackSize);
                     return true;
@@ -227,16 +325,13 @@ public abstract class OTHSteamMultiBase<T extends OTHSteamMultiBase<T>> extends 
         }
         for (MTEHatchSteamBusInput tHatch : validMTEList(mSteamInputs)) {
             tHatch.mRecipeMap = getRecipeMap();
-            for (int i = tHatch.getBaseMetaTileEntity()
-                .getSizeInventory() - 1; i >= 0; i--) {
-                if (GTUtility.areStacksEqual(
-                    aStack,
-                    tHatch.getBaseMetaTileEntity()
-                        .getStackInSlot(i))) {
-                    if (tHatch.getBaseMetaTileEntity()
-                        .getStackInSlot(0).stackSize >= aStack.stackSize) {
-                        tHatch.getBaseMetaTileEntity()
-                            .decrStackSize(0, aStack.stackSize);
+            IGregTechTileEntity tile = tHatch.getBaseMetaTileEntity();
+            for (int i = tile.getSizeInventory() - 1; i >= 0; i--) {
+                ItemStack stored = tile.getStackInSlot(i);
+                // 修复:之前误用 getStackInSlot(0) 比较/扣除,会扣错槽位
+                if (stored != null && GTUtility.areStacksEqual(aStack, stored)) {
+                    if (stored.stackSize >= aStack.stackSize) {
+                        tile.decrStackSize(i, aStack.stackSize);
                         return true;
                     }
                 }
@@ -291,6 +386,16 @@ public abstract class OTHSteamMultiBase<T extends OTHSteamMultiBase<T>> extends 
         for (MTEHatchCustomFluidBase tHatch : validMTEList(mSteamInputFluids)) tHatch.updateSlots();
         for (MTEHatchSteamBusInput tHatch : validMTEList(mSteamInputs)) tHatch.updateSlots();
         for (MTEHatchInputBus tHatch : validMTEList(mInputBusses)) tHatch.updateSlots();
+    }
+
+    @Override
+    public List<IOutputBus> getOutputBusses() {
+        // 蒸汽输出仓现在进 mSteamOutputs 而非 mOutputBusses,必须在这里补上,否则产物会丢失
+        List<IOutputBus> output = new ArrayList<>(super.getOutputBusses());
+        for (MTEHatchOutputBus outputBus : validMTEList(mSteamOutputs)) {
+            if (outputBus.isValid()) output.add(outputBus);
+        }
+        return output;
     }
 
     @Override
@@ -547,9 +652,9 @@ public abstract class OTHSteamMultiBase<T extends OTHSteamMultiBase<T>> extends 
         return overclockDescriber;
     }
 
-    protected enum SteamHatchElement implements IHatchElement<OTHSteamMultiBase<?>> {
+    public enum SteamHatchElement implements IHatchElement<OTHSteamMultiBase<?>> {
 
-        InputBus_Steam {
+        InputBus_Steam("hatch.input_bus.tier.steam") {
 
             @Override
             public List<? extends Class<? extends IMetaTileEntity>> mteClasses() {
@@ -560,8 +665,13 @@ public abstract class OTHSteamMultiBase<T extends OTHSteamMultiBase<T>> extends 
             public long count(OTHSteamMultiBase<?> t) {
                 return t.mSteamInputs.size();
             }
+
+            @Override
+            public IGTHatchAdder<? super OTHSteamMultiBase<?>> adder() {
+                return OTHSteamMultiBase::addSteamBusInput;
+            }
         },
-        OutputBus_Steam {
+        OutputBus_Steam("hatch.output_bus.tier.steam") {
 
             @Override
             public List<? extends Class<? extends IMetaTileEntity>> mteClasses() {
@@ -572,7 +682,28 @@ public abstract class OTHSteamMultiBase<T extends OTHSteamMultiBase<T>> extends 
             public long count(OTHSteamMultiBase<?> t) {
                 return t.mSteamOutputs.size();
             }
+
+            @Override
+            public IGTHatchAdder<? super OTHSteamMultiBase<?>> adder() {
+                return OTHSteamMultiBase::addSteamBusOutput;
+            }
         },;
+
+        private final String langKey;
+
+        SteamHatchElement(String langKey) {
+            this.langKey = "gt.blockmachines." + langKey + ".name";
+        }
+
+        @Override
+        public String getDescriptionLangKey() {
+            return langKey;
+        }
+
+        @Override
+        public String getDisplayName() {
+            return StatCollector.translateToLocal(langKey);
+        }
 
         @Override
         public IGTHatchAdder<? super OTHSteamMultiBase<?>> adder() {
@@ -590,8 +721,39 @@ public abstract class OTHSteamMultiBase<T extends OTHSteamMultiBase<T>> extends 
         return false;
     }
 
+    // ── 结构错误检查(移植自 GT5U 的 MTESteamMultiBlockBase)──
+
+    /** 蒸汽输入仓必须存在。 */
+    protected final void checkHasSteamInput(List<StructureError> errors) {
+        if (mSteamInputFluids.isEmpty()) {
+            errors.add(StructureErrors.of("GT5U.gui.text.structure_error.missing_steam_input"));
+        }
+    }
+
+    protected final void checkHasSteamInputBus(List<StructureError> errors) {
+        if (mSteamInputs.isEmpty()) {
+            errors.add(StructureErrors.of("GT5U.gui.text.structure_error.missing_steam_input_bus"));
+        }
+    }
+
+    protected final void checkHasSteamOutputBus(List<StructureError> errors) {
+        if (mSteamOutputs.isEmpty()) {
+            errors.add(StructureErrors.of("GT5U.gui.text.structure_error.missing_steam_output_bus"));
+        }
+    }
+
     @Override
-    public void checkHatch(List<StructureError> errors) {
-        super.checkHatch(errors);
+    protected void checkHasAnyInput(List<StructureError> errors) {
+        // 蒸汽机器输入 = 蒸汽输入总线 + 普通输入总线 + 输入仓 + 双输入仓
+        if (mSteamInputs.isEmpty() && mInputBusses.isEmpty() && mInputHatches.isEmpty() && mDualInputHatches.isEmpty()) {
+            errors.add(StructureErrors.of("GT5U.gui.text.structure_error.no_input"));
+        }
+    }
+
+    @Override
+    protected void checkHasAnyOutput(List<StructureError> errors) {
+        if (mSteamOutputs.isEmpty() && mOutputBusses.isEmpty() && mOutputHatches.isEmpty()) {
+            errors.add(StructureErrors.of("GT5U.gui.text.structure_error.no_output"));
+        }
     }
 }

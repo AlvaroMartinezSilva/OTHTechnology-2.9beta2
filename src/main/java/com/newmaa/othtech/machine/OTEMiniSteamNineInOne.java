@@ -2,6 +2,8 @@ package com.newmaa.othtech.machine;
 
 import static com.gtnewhorizon.structurelib.structure.StructureUtility.ofBlock;
 import static com.gtnewhorizon.structurelib.structure.StructureUtility.ofChain;
+import static com.newmaa.othtech.machine.machineclass.OTHSteamMultiBase.SteamHatchElement.InputBus_Steam;
+import static com.newmaa.othtech.machine.machineclass.OTHSteamMultiBase.SteamHatchElement.OutputBus_Steam;
 import static gregtech.api.GregTechAPI.sBlockCasings1;
 import static gregtech.api.GregTechAPI.sBlockCasings2;
 import static gregtech.api.GregTechAPI.sBlockCasings3;
@@ -361,8 +363,8 @@ public class OTEMiniSteamNineInOne extends OTHSteamMultiBase<OTEMiniSteamNineInO
                             .build(),
                         buildHatchAdder(OTEMiniSteamNineInOne.class)
                             .atLeast(
-                                SteamHatchElement.InputBus_Steam,
-                                SteamHatchElement.OutputBus_Steam,
+                                InputBus_Steam,
+                                OutputBus_Steam,
                                 InputHatch,
                                 InputBus,
                                 OutputHatch,
