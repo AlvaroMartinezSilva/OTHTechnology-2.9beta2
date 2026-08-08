@@ -1,7 +1,7 @@
 package com.newmaa.othtech.machine;
 
+import static com.gtnewhorizon.gtnhlib.util.numberformatting.NumberFormatUtil.formatNumber;
 import static com.gtnewhorizon.structurelib.structure.StructureUtility.ofBlock;
-import static com.gtnewhorizon.structurelib.structure.StructureUtility.withChannel;
 import static gregtech.api.GregTechAPI.*;
 import static gregtech.api.enums.GTValues.VN;
 import static gregtech.api.enums.HatchElement.*;
@@ -9,6 +9,7 @@ import static gregtech.api.enums.Textures.BlockIcons.OVERLAY_DTPF_OFF;
 import static gregtech.api.enums.Textures.BlockIcons.OVERLAY_DTPF_ON;
 import static gregtech.api.enums.Textures.BlockIcons.OVERLAY_FUSION1_GLOW;
 import static gregtech.api.enums.Textures.BlockIcons.casingTexturePages;
+import static gregtech.api.util.GTStructureUtility.activeCoils;
 import static gregtech.api.util.GTStructureUtility.buildHatchAdder;
 import static gregtech.api.util.GTStructureUtility.ofCoil;
 import static gregtech.api.util.GTUtility.validMTEList;
@@ -41,12 +42,7 @@ import com.gtnewhorizon.structurelib.alignment.constructable.ISurvivalConstructa
 import com.gtnewhorizon.structurelib.structure.IStructureDefinition;
 import com.gtnewhorizon.structurelib.structure.ISurvivalBuildEnvironment;
 import com.gtnewhorizon.structurelib.structure.StructureDefinition;
-import com.gtnewhorizons.modularui.api.drawable.IDrawable;
-import com.gtnewhorizons.modularui.api.drawable.UITexture;
-import com.gtnewhorizons.modularui.api.screen.ModularWindow;
-import com.gtnewhorizons.modularui.api.screen.UIBuildContext;
-import com.gtnewhorizons.modularui.common.widget.ButtonWidget;
-import com.gtnewhorizons.modularui.common.widget.FakeSyncWidget;
+import com.newmaa.othtech.machine.gui.OTEBBPlasmaForgeGui;
 import com.newmaa.othtech.machine.machineclass.OTHMultiMachineBase;
 import com.newmaa.othtech.machine.machineclass.OTHProcessingLogic;
 import com.newmaa.othtech.utils.Utils;
@@ -55,9 +51,9 @@ import cpw.mods.fml.relauncher.Side;
 import cpw.mods.fml.relauncher.SideOnly;
 import gregtech.api.enums.HeatingCoilLevel;
 import gregtech.api.enums.SoundResource;
-import gregtech.api.gui.modularui.GTUITextures;
 import gregtech.api.interfaces.ITexture;
 import gregtech.api.interfaces.metatileentity.IMetaTileEntity;
+import gregtech.api.interfaces.tileentity.IGregTechDeviceInformation;
 import gregtech.api.interfaces.tileentity.IGregTechTileEntity;
 import gregtech.api.logic.ProcessingLogic;
 import gregtech.api.metatileentity.implementations.MTEHatch;
@@ -67,31 +63,41 @@ import gregtech.api.recipe.check.CheckRecipeResult;
 import gregtech.api.recipe.check.CheckRecipeResultRegistry;
 import gregtech.api.recipe.check.SimpleCheckRecipeResult;
 import gregtech.api.render.TextureFactory;
+import gregtech.api.structure.error.ErrorType;
 import gregtech.api.structure.error.StructureError;
+import gregtech.api.structure.error.StructureErrorRegistry;
+import gregtech.api.structure.error.StructureErrors;
 import gregtech.api.util.GTModHandler;
 import gregtech.api.util.GTRecipe;
 import gregtech.api.util.GTRecipeConstants;
 import gregtech.api.util.GTUtility;
 import gregtech.api.util.MultiblockTooltipBuilder;
 import gregtech.api.util.OverclockCalculator;
+import gregtech.common.gui.modularui.multiblock.base.MTEMultiBlockBaseGui;
 import gregtech.common.misc.GTStructureChannels;
 import mcp.mobius.waila.api.IWailaConfigHandler;
 import mcp.mobius.waila.api.IWailaDataAccessor;
 import tectech.thing.block.BlockQuantumGlass;
-import tectech.thing.gui.TecTechUITextures;
 
 public class OTEBBPlasmaForge extends OTHMultiMachineBase<OTEBBPlasmaForge> implements ISurvivalConstructable {
 
     // 老大哥锻炉,老大哥的恩情还不完
     protected void updatetier() {
-        ItemStack aGuiStack = this.getControllerSlot();
-        if (aGuiStack != null) {
-            if (GTUtility.areStacksEqual(aGuiStack, GTModHandler.getModItem("gregtech", "gt.metaitem.03", 1, 32758))) {
-                this.MLevel = 2;
-            }
+        if (hasCalibrationMatrix()) {
+            this.MLevel = 2;
         } else {
             this.MLevel = 1;
         }
+    }
+
+    /**
+     * 控制器槽位是否放入超维校准矩阵(meta 32758),MLevel 2 的判定依据。
+     * 控制器槽是同步的库存槽,客户端永远最新,GUI 按钮以此作为门槛(同 DTPF 的做法)。
+     */
+    public boolean hasCalibrationMatrix() {
+        ItemStack aGuiStack = this.getControllerSlot();
+        return aGuiStack != null
+            && GTUtility.areStacksEqual(aGuiStack, GTModHandler.getModItem("gregtech", "gt.metaitem.03", 1, 32758));
     }
 
     @Override
@@ -461,7 +467,8 @@ public class OTEBBPlasmaForge extends OTHMultiMachineBase<OTEBBPlasmaForge> impl
                 .addElement('C', ofBlock(sBlockCasings1, 14))
                 .addElement(
                     'D',
-                    withChannel("coil", ofCoil(OTEBBPlasmaForge::setCoilLevel, OTEBBPlasmaForge::getCoilLevel)))
+                    GTStructureChannels.HEATING_COIL
+                        .use(activeCoils(ofCoil(OTEBBPlasmaForge::setCoilLevel, OTEBBPlasmaForge::getCoilLevel))))
                 .addElement('E', ofBlock(sBlockCasingsTT, 7))
                 .addElement('F', ofBlock(sBlockCasingsTT, 8))
                 .addElement('G', ofBlock(BlockQuantumGlass.INSTANCE, 0))
@@ -486,24 +493,36 @@ public class OTEBBPlasmaForge extends OTHMultiMachineBase<OTEBBPlasmaForge> impl
     @Override
     protected MultiblockTooltipBuilder createTooltip() {
         MultiblockTooltipBuilder tt = new MultiblockTooltipBuilder();
+        // ── 序章:中二宣言 ──
         tt.addMachineType(translateToLocal("ote.bbpf.0"))
             .addInfo(translateToLocal("ote.bbpf.1"))
-            .addInfo(translateToLocal("ote.bbpf.2"))
-            .addInfo(translateToLocal("ote.bbpf.3"))
-            .addInfo((translateToLocal("ote.bbpf.4")))
-            .addInfo((translateToLocal("ote.bbpf.6")))
-            .addInfo((translateToLocal("ote.bbpf.7")))
+            .addInfo(translateToLocal("ote.bbpf.8"))
             .addSeparator()
+            // ── 核心数值:并行 / 线圈效率 / 上限突破 ──
+            .addInfo(translateToLocal("ote.bbpf.2"))
+            .addInfo(translateToLocal("ote.bbpf.9"))
+            .addInfo(translateToLocal("ote.bbpf.10"))
+            .addInfo(translateToLocal("ote.bbpf.3"))
+            .addSeparator()
+            // ── 强化:校准矩阵 → 完美超频 + 无线模式 ──
+            .addInfo(translateToLocal("ote.bbpf.4"))
+            .addInfo(translateToLocal("ote.bbpf.11"))
+            .addInfo(translateToLocal("ote.bbpf.6"))
+            .addSeparator()
+            .addInfo(translateToLocal("ote.bbpf.7"))
+            .addSeparator()
+            // ── 结构(按 SHIFT 查看)──
             .addController(translateToLocal("ote.bbpf.0"))
             .beginStructureBlock(47, 11, 47, false)
+            .addStructureInfo(translateToLocal("ote.bbpf.12"))
+            .addStructureInfo(translateToLocal("ote.bbpf.13"))
+            .addStructureInfo(translateToLocal("ote.bbpf.14"))
             .addInputBus("AnyInputBus", 1)
             .addOutputBus("AnyOutputBus", 1)
             .addInputHatch("AnyInputHatch", 1)
             .addOutputHatch("AnyOutputHatch", 1)
             .addEnergyHatch("AnyEnergyHatch", 1)
             .addSubChannelUsage(GTStructureChannels.HEATING_COIL)
-            .addSeparator()
-            .addInfo("§b§lAuthor:§r§kunknown§r§lczqwq§r")
             .toolTipFinisher();
         return tt;
     }
@@ -724,25 +743,40 @@ public class OTEBBPlasmaForge extends OTHMultiMachineBase<OTEBBPlasmaForge> impl
 
     @Override
     public void checkMachine(IGregTechTileEntity aBaseMetaTileEntity, ItemStack aStack, List<StructureError> errors) {
-        // Reset heating capacity.
-        updatetier();
+        // Reset value
         mHeatingCapacity = 0;
-
-        // Get heating capacity from coils in structure.
         setCoilLevel(HeatingCoilLevel.None);
-        mEnergyHatches.clear();
-        mExoticEnergyHatches.clear();
-        mInputHatches.clear();
-        mInputBusses.clear();
-        if (getCoilLevel() == HeatingCoilLevel.None) return;
+
+        // 线圈等级由 checkPiece 扫描结构时通过 ofCoil 写入 mCoilLevel,必须先扫描再判断
         if (!checkPiece(STRUCTURE_PIECE_MAIN, 23, 5, 20, errors)) return;
-        mHeatingCapacity = (int) getCoilLevel().getHeat();
+        if (getCoilLevel() == HeatingCoilLevel.None) {
+            errors.add(StructureErrorRegistry.COIL_LEVEL_NOT_ENOUGH);
+        }
+
+        // 无线模式使用无线网络供电,不需要能源仓
+        if (!isWirelessMode) {
+            checkHasAnyEnergy(errors);
+        }
+        checkHasInputBus(errors);
+        checkHasOutputBus(errors);
+
         // 无线模式下不允许能源仓
         if (isWirelessMode && (!mEnergyHatches.isEmpty() || !mExoticEnergyHatches.isEmpty())) {
+            errors.add(
+                StructureErrors
+                    .hatchCount(ErrorType.TOO_MANY, Energy, mEnergyHatches.size() + mExoticEnergyHatches.size(), 0));
             return;
+        }
+        if (errors.isEmpty()) {
+            mHeatingCapacity = (int) getCoilLevel().getHeat();
         }
         updatetier();
         repairMachine();
+    }
+
+    @Override
+    public void getExtraInfoData(List<String> info) {
+        info.add(IGregTechDeviceInformation.encode("GT5U.EBF.heat.s", formatNumber(this.mHeatingCapacity)));
     }
 
     @NotNull
@@ -759,10 +793,9 @@ public class OTEBBPlasmaForge extends OTHMultiMachineBase<OTEBBPlasmaForge> impl
         mOutputItems = processingLogic.getOutputItems();
         mOutputFluids = processingLogic.getOutputFluids();
 
-        // 设置能量消耗（无线模式下已设为0，有线模式下正常设置）
-        if (!isWirelessMode) {
-            lEUt = -processingLogic.getCalculatedEut();
-        }
+        // 设置能量消耗（无线模式下 calculatedEut 已在 onRecipeStart 中被置为 0，此处恒为 0；
+        // 若不更新，lEUt 会残留有线模式下的数值，导致机器无能源仓却空转耗电）
+        lEUt = -processingLogic.getCalculatedEut();
 
         return result;
     }
@@ -892,55 +925,33 @@ public class OTEBBPlasmaForge extends OTHMultiMachineBase<OTEBBPlasmaForge> impl
     }
 
     @Override
-    public void addUIWidgets(ModularWindow.Builder builder, UIBuildContext buildContext) {
-        builder.widget(new ButtonWidget().setOnClick((clickData, widget) -> {
-            // isWireless on!
-            // 亿万火种之怒,燃尽此身!
-            if (getMLevel() >= 2) {
-                if (this.mEnergyHatches.isEmpty() || this.mExoticEnergyHatches.isEmpty()) {
-                    isWirelessMode = !isWirelessMode;
-                } else {
-                    isWirelessMode = false;
-                }
-            }
-
-        })
-            .setPlayClickSound(true)
-            .setBackground(() -> {
-                List<UITexture> ret = new ArrayList<>();
-                ret.add(GTUITextures.BUTTON_STANDARD);
-
-                // fix：只有在 MLevel >= 2 时才根据 isWirelessMode 显示不同图标
-                if (getMLevel() >= 2) {
-                    if (isWirelessMode) {
-                        ret.add(TecTechUITextures.OVERLAY_BUTTON_POWER_PASS_ON);
-                    } else {
-                        ret.add(TecTechUITextures.OVERLAY_BUTTON_POWER_PASS_OFF);
-                    }
-                } else {
-                    // 如果 MLevel < 2，总是显示关闭状态的图标
-                    ret.add(TecTechUITextures.OVERLAY_BUTTON_POWER_PASS_OFF);
-                }
-                return ret.toArray(new IDrawable[0]);
-            })
-            .addTooltip(translateToLocal("ote.bbpf.5"))
-            .setPos(174, 112)
-            .setSize(16, 16)
-            .attachSyncer(
-                new FakeSyncWidget.BooleanSyncer(
-                    () -> isWirelessMode && getMLevel() >= 2, // 只同步当条件满足时的状态
-                    (val) -> {
-                        // 只有当MLevel >= 2时才更新isWirelessMode
-                        if (getMLevel() >= 2) {
-                            isWirelessMode = val;
-                        }
-                    }),
-                builder));
-        super.addUIWidgets(builder, buildContext);
+    protected @NotNull MTEMultiBlockBaseGui<?> getGui() {
+        return new OTEBBPlasmaForgeGui(this);
     }
 
-    private int getMLevel() {
+    public int getMLevel() {
         return MLevel;
+    }
+
+    public boolean isWirelessModeEnabled() {
+        return isWirelessMode;
+    }
+
+    /**
+     * 无线模式开关。规则在服务端强制执行(GUI 的 C2S 同步值经此落字段):
+     * 只有 MLevel &gt;= 2 且无能源仓才能开启;关闭永远允许。
+     * 注意:NBT 加载(loadNBTData)直接写字段,不走此规则。
+     */
+    public void setWirelessModeEnabled(boolean value) {
+        if (value && (getMLevel() < 2 || !areEnergyHatchesEmpty())) {
+            isWirelessMode = false;
+            return;
+        }
+        isWirelessMode = value;
+    }
+
+    public boolean areEnergyHatchesEmpty() {
+        return mEnergyHatches.isEmpty() && mExoticEnergyHatches.isEmpty();
     }
 
     public void saveNBTData(NBTTagCompound aNBT) {
@@ -981,21 +992,20 @@ public class OTEBBPlasmaForge extends OTHMultiMachineBase<OTEBBPlasmaForge> impl
 
     public final void onScrewdriverRightClick(ForgeDirection side, EntityPlayer aPlayer, float aX, float aY, float aZ,
         ItemStack aTool) {
-        if (getMLevel() >= 2) {
-            if (this.mEnergyHatches.isEmpty() && this.mExoticEnergyHatches.isEmpty()) {
-                isWirelessMode = !isWirelessMode;
-                if (isWirelessMode) {
-                    GTUtility.sendChatToPlayer(aPlayer, StatCollector.translateToLocal("ote.bbpf.wireless.on"));
-                } else {
-                    GTUtility.sendChatToPlayer(aPlayer, StatCollector.translateToLocal("ote.bbpf.wireless.off"));
-                }
+        if (getMLevel() < 2) {
+            GTUtility.sendChatToPlayer(aPlayer, StatCollector.translateToLocal("ote.bbpf.wireless.invalid"));
+            return;
+        }
+        if (areEnergyHatchesEmpty()) {
+            setWirelessModeEnabled(!isWirelessModeEnabled());
+            if (isWirelessModeEnabled()) {
+                GTUtility.sendChatToPlayer(aPlayer, StatCollector.translateToLocal("ote.bbpf.wireless.on"));
             } else {
-                isWirelessMode = false;
-                GTUtility.sendChatToPlayer(aPlayer, StatCollector.translateToLocal("ote.bbpf.wireless.energyhatch"));
+                GTUtility.sendChatToPlayer(aPlayer, StatCollector.translateToLocal("ote.bbpf.wireless.off"));
             }
-            {
-                GTUtility.sendChatToPlayer(aPlayer, StatCollector.translateToLocal("ote.bbpf.wireless.invalid"));
-            }
+        } else {
+            setWirelessModeEnabled(false);
+            GTUtility.sendChatToPlayer(aPlayer, StatCollector.translateToLocal("ote.bbpf.wireless.energyhatch"));
         }
     }
 }

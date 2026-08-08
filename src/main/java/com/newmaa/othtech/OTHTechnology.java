@@ -105,6 +105,7 @@ public class OTHTechnology {
     public void postInit(FMLPostInitializationEvent event) {
         proxy.postInit(event);
         LOG.info("The Isa Mill is invincible!");
+        LOG.info("NewMaa的恩情还不完!");
         MachineLoader.loadMachinePostInit();
         // RecipeLoader.loadRecipesPostInit();
         // 添加自定义配方

@@ -2,9 +2,11 @@ package com.newmaa.othtech.machine;
 
 import static net.minecraft.util.StatCollector.translateToLocal;
 
+import com.gtnewhorizon.gtnhlib.util.AnimatedTooltipHandler;
 import com.newmaa.othtech.common.OTHItemList;
 import com.newmaa.othtech.machine.hatch.OTEHatchRack;
 import com.newmaa.othtech.machine.hatch.OTEWTFHatch;
+import com.newmaa.othtech.utils.AuthorAnimation;
 
 import gregtech.api.enums.Materials;
 import gregtech.api.enums.TierEU;
@@ -183,6 +185,9 @@ public class MachineLoader {
         OTHItemList.Beeyonds.set(new OTEBeeyonds(IDs + 58, "IndustrialBeeHouse", translateToLocal("ote.tn.bee")));
         OTHItemList.OTEBBPlasmaForge
             .set(new OTEBBPlasmaForge(IDs + 59, "OTEBBPlasmaForge", translateToLocal("ote.tn.bbpf")));
+        // 注册实时动画作者行(gtnhlib AnimatedTooltipHandler 在渲染时逐帧求值,同 GT5U LoaderMetaTileEntities 的做法)
+        AnimatedTooltipHandler
+            .addItemTooltip(OTHItemList.OTEBBPlasmaForge.get(1), AuthorAnimation.getTooltipSupplier());
         OTHItemList.OTEComputer.set(new OTEComputer(IDs + 60, "OTEComputer", translateToLocal("ote.computer.name")));
         OTHItemList.OTEHatchRack
             .set(new OTEHatchRack(IDs + 61, "OTEHatchRack", translateToLocal("ote.calc.rank"), 11).getStackForm(1L));
